@@ -166,7 +166,7 @@ replacePartialContent = function(data) {
 
 handleError = function() {
   $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html('<div id="message">有問題呀Reload啦[sosad]</div>');
-  var message = $('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #message');
+  var message = $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #message');
   flashMessage(message);
 }
 
