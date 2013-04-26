@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        1.1.0
+// @version        1.1.1
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
@@ -170,7 +170,7 @@ replacePartialContent = function(response) {
 }
 
 handleError = function() {
-  $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html('<div id="message">有問題呀Reload啦[sosad]</div>');
+  $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html('<div id="message">有問題呀Reload啦<img src="faces/sosad.gif" /></div>');
   var message = $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #message');
   flashMessage(message);
 }
@@ -243,7 +243,7 @@ flashMessage = function(item) {
 }
 
 setup = function() {
-  $j('<div id="ctl00_ContentPlaceHolder1_UpdatePanelHistory"><div id="message">Load緊呀等陣啦O:-)</div></div><br />').insertBefore('div#ctl00_ContentPlaceHolder1_UpdatePanelPM');
+  $j('<div id="ctl00_ContentPlaceHolder1_UpdatePanelHistory"><div id="message">Load緊呀等陣啦<img src="faces/angel.gif" /></div></div><br />').insertBefore('div#ctl00_ContentPlaceHolder1_UpdatePanelPM');
   var message = $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #message');
   flashMessage(message);
 }
