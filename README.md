@@ -8,7 +8,9 @@ Let you find the post you replied or LMed in your profile page.
 # Firefox (Currently not working)
 1. Install [GreaseMonkey](https://addons.mozilla.org/zh-tw/firefox/addon/greasemonkey/)
 2. Open (https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js)
+3. You may need to enable it in GreaseMonkey before use
 
 # Chrome
 1. Install [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
 2. Open (https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js)
+3. Choose "OK" to install into Tampermonkey
