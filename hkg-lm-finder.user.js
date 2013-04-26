@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        1.2.1
+// @version        1.2.2
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
@@ -65,7 +65,7 @@ requestPageFull = function() {
   changeAndFlashMessage(message);
 
   retriedCount++;
-  var requestUrl = window.location.href.replace(/forum\d/, 'forum' + lmServer);
+  var requestUrl = window.location.href.replace(/forum\d+/, 'forum' + lmServer);
   ajaxRequest = GM_xmlhttpRequest({
     method: 'GET',
     url: requestUrl,
@@ -106,7 +106,7 @@ requestPagePartial = function(page) {
   var message = '試下Server ' + lmServer + ' 先<img src="faces/angel.gif" />';
   changeAndFlashMessage(message);
 
-  var requestUrl = window.location.href.replace(/forum\d/, 'forum' + lmServer);
+  var requestUrl = window.location.href.replace(/forum\d+/, 'forum' + lmServer);
   var data = $j.param({
           'ctl00$ScriptManager1': 'ctl00$ScriptManager1|ctl00$ContentPlaceHolder1$btn_GoPageNo',
           'ctl00_ContentPlaceHolder1_tc_Profile_ClientState': '{"ActiveTabIndex":0,"TabState":[true,true,true]}',
