@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        1.1.1
+// @version        1.2.0
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
@@ -34,36 +34,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 var $j = jQuery.noConflict();
 
 var servers = [1,2,3,4,5,6,7,8];
+var availableServer;
 var viewStateOutdate = 15 * 60 * 1000;
+var ajaxTimeout = 15000;
+var ajaxRequest;
+var ajaxRequestTimer;
 var lmServer;
 var viewState;
 var changePage;
 
-var logoutCount = 0;
+var retriedCount = 0;
 
 // Init options for full page loading
 initPageFull = function() {
   // Randomly choose a server other than the server which user is currently using
   var currentServer = parseInt(window.location.href.match(/forum(\d+)/)[1]);
-  var availableServer = $j.grep(servers, function(value) { return value != currentServer });
+  availableServer = $j.grep(availableServer, function(value) { return value != currentServer });
   lmServer = availableServer[Math.floor(Math.random()*availableServer.length)];
+  viewState = null;
 }
 
 requestPageFull = function() {
-  if(logoutCount > 1) initPageFull();
-  if(logoutCount > 4) {
-    handleError();
+  if(retriedCount > 1) initPageFull();
+  if(retriedCount > 10) {
+    tooManyRetryError();
     return;
   }
 
+  retriedCount++;
   var requestUrl = window.location.href.replace(/forum\d/, 'forum' + lmServer);
-  GM_xmlhttpRequest({
+  ajaxRequest = GM_xmlhttpRequest({
     method: 'GET',
     url: requestUrl,
+    timeout: ajaxTimeout,
     headers: {'Content-type': 'application/x-www-form-urlencoded'},
-    onload: function(response) {replaceContent(response); storeStatus();},
-    onerror: function(response) {handleError(); storeStatus();}
+    onload: function(response) {ajaxRequest = null; if(replaceContent(response)) storeStatus();},
+    onerror: function(response) {ajaxRequest = null; handleError(); },
+    ontimeout: handleTimeout
   });
+
+  // Specical handling for TamperMonkey
+  if(TM_xmlhttpRequest) timeoutRequest();
 }
 
 // Init options for partial page loading
@@ -92,19 +103,24 @@ requestPagePartial = function(page) {
                'ctl00$ContentPlaceHolder1$btn_GoPageNo': 'Go'
          });
 
-  GM_xmlhttpRequest({
+  ajaxRequest = GM_xmlhttpRequest({
     method: 'POST',
     url: requestUrl,
     data: data,
+    timeout: ajaxTimeout,
     headers: {'Content-type': 'application/x-www-form-urlencoded'},
-    onload: function(response) {replacePartialContent(response); storeStatus();},
-    onerror: function(response) {handleError(); storeStatus();}
+    onload: function(response) {ajaxRequest = null; if(replacePartialContent(response)) storeStatus();},
+    onerror: function(response) {ajaxRequest = null; handleError(); },
+    ontimeout: handleTimeout
   });
+
+  // Specical handling for TamperMonkey
+  if(TM_xmlhttpRequest) timeoutRequest();
 }
 
 // Store values needed for changing page
 storeStatus = function() {
-  window.LM_CURRENT_PAGE = $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #ctl00_ContentPlaceHolder1_PageNoTextBox').val();
+  window.LM_CURRENT_PAGE = parseInt($j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #ctl00_ContentPlaceHolder1_PageNoTextBox').val());
   GM_setValue('lm_server', lmServer);
   GM_setValue('viewstate', viewState);
   GM_setValue('lm_last_timestamp', new Date().getTime());
@@ -119,7 +135,7 @@ storeStatus = function() {
 replaceContent = function(response) {
   if(!response.responseText || response.responseText.length === 0) {
     handleError();
-    return;
+    return false;
   }
 
   var html = $j.parseHTML(response.responseText);
@@ -138,41 +154,95 @@ replaceContent = function(response) {
   if(bookmark.length === 0) {
     $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html(history.html());
     replaceButton();
-    logoutCount = 0;
+    retriedCount = 0;
     console.log('full request finished');
   } else {
     logout();
-    return;
+    return false;
   }
+  return true;
 }
 
 // Search LM data in partial page and insert
 replacePartialContent = function(response) {
   if(!response.responseText || response.responseText.length === 0) {
     handleError();
-    return;
+    return false;
   }
   if(response.responseText.indexOf('<!DOCTYPE html') >= 0) {
-    replaceContent(response);
-    return;
+    return replaceContent(response);
+  }
+  if(response.responseText.indexOf('ctl00_ContentPlaceHolder1_UpdatePanelHistory') === -1) {
+    handleError();
+    return false;
   }
 
   var startPos = response.responseText.indexOf('<div');
   var endPos = response.responseText.lastIndexOf('/table>');
-  if(startPos < 0 || endPos < 0) return;
-  
+  if(startPos < 0 || endPos < 0) {
+    handleError();
+    return false;
+  };
+
   endPos = endPos + '/table>'.length;
   var slicedData = response.responseText.slice(startPos, endPos);
+  viewState = response.responseText.match(/\|__VIEWSTATE\|.*?\|/gm)[0].replace(/\|__VIEWSTATE\|/gm, '').replace(/\|/gm, '') || viewState;
+
   $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html(slicedData);
   replaceButton();
-  logoutCount = 0;
+  retriedCount = 0;
   console.log('partial request finished');
+  return true;
+}
+
+// Can't simply set 'timeout' value in GM_xmlhttpRequest as TamperMonkey do not support it
+timeoutRequest = function() {
+  clearTimeout(ajaxRequestTimer);
+  ajaxRequestTimer = setTimeout(handleTamperMonkeyTimeout, ajaxTimeout);
+}
+
+handleTamperMonkeyTimeout = function() {
+  if(ajaxRequest && ajaxRequest.abort) {
+    ajaxRequest.abort();
+    handleTimeout();
+  }
+}
+
+handleTimeout = function() {
+  console.log('server timeout: ' + lmServer);
+  var message = 'Server '+ lmServer +' 太慢喇轉緊第個Server<img src="faces/sosad.gif" />';
+
+  changeAndFlashMessage(message);
+  changeServer();
 }
 
 handleError = function() {
-  $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html('<div id="message">有問題呀Reload啦<img src="faces/sosad.gif" /></div>');
-  var message = $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #message');
-  flashMessage(message);
+  var message = 'Server '+ lmServer +' 有問題轉緊第個Server<img src="faces/sosad.gif" />';
+
+  changeAndFlashMessage(message);
+  changeServer();
+}
+
+tooManyRetryError = function() {
+  var message = '唔知咩事試過幾個Server都唔得<img src="faces/sosad.gif" />';
+
+  changeAndFlashMessage(message);
+}
+
+changeServer = function() {
+  availableServer = $j.grep(availableServer, function(value) { return value !== lmServer });
+  if(availableServer.length === 0) {
+    tooManyRetryError();
+    return;
+  }
+  initPageFull();
+  requestPageFull();
+}
+
+changeAndFlashMessage = function(message) {
+  $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html('<div id="message">'+message+'</div>');
+  var messageDiv = $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #message');
+  flashMessage(messageDiv);
 }
 
 // Change button event, let this script handle page changing
@@ -184,7 +254,6 @@ replaceButton = function() {
 
 // Logout if the target server is loged in
 logout = function(serverNumber) {
-  logoutCount++;
   var requestUrl = 'http://forum' + lmServer + '.hkgolden.com/logout.aspx';
   $j.ajax({
     url: requestUrl,
@@ -198,21 +267,27 @@ logout = function(serverNumber) {
 
 // Store the target page number in cookie
 nextPage = function() {
-  var page = parseInt(window.LM_CURRENT_PAGE) + 1;
+  var page = window.LM_CURRENT_PAGE + 1;
+  if(page === window.LM_CURRENT_PAGE) return false;
   document.cookie = 'lm_change_page=' + page;
   location.reload();
+  return false;
 }
 
 previousPage = function() {
-  var page = Math.max(parseInt(window.LM_CURRENT_PAGE) - 1, 1);
+  var page = Math.max(window.LM_CURRENT_PAGE - 1, 1);
+  if(page === window.LM_CURRENT_PAGE) return false;
   document.cookie = 'lm_change_page=' + page;
   location.reload();
+  return false;
 }
 
 gotoPage = function() {
-  var page = $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #ctl00_ContentPlaceHolder1_PageNoTextBox').val();
+  var page = parseInt($j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #ctl00_ContentPlaceHolder1_PageNoTextBox').val());
+  if(page === window.LM_CURRENT_PAGE) return false;
   document.cookie = 'lm_change_page=' + page;
   location.reload();
+  return false;
 }
 
 deleteCookie = function(c_name) {
@@ -243,9 +318,11 @@ flashMessage = function(item) {
 }
 
 setup = function() {
-  $j('<div id="ctl00_ContentPlaceHolder1_UpdatePanelHistory"><div id="message">Load緊呀等陣啦<img src="faces/angel.gif" /></div></div><br />').insertBefore('div#ctl00_ContentPlaceHolder1_UpdatePanelPM');
-  var message = $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #message');
-  flashMessage(message);
+  availableServer = servers;
+  $j('<div id="ctl00_ContentPlaceHolder1_UpdatePanelHistory"><div id="message"></div></div><br />').insertBefore('div#ctl00_ContentPlaceHolder1_UpdatePanelPM');
+
+  var message = 'Load緊呀等陣啦<img src="faces/angel.gif" />';
+  changeAndFlashMessage(message);
 }
 
 start = function() {
