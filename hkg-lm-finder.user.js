@@ -3,9 +3,13 @@
 // @namespace      http://github.com/Xelio/
 // @version        1.0.1
 // @description    HKG LM finder
+// @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
 // @match          http://*.hkgolden.com/ProfilePage.aspx?userid=*
 // @require        http://code.jquery.com/jquery-1.9.1.min.js
+// @grant          GM_getValue
+// @grant          GM_setValue
+// @grant          GM_xmlhttpRequest
 // @copyright      2013, Xelio
 // ==/UserScript==
 
