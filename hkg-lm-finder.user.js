@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        1.2.0
+// @version        1.2.1
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
@@ -61,6 +61,9 @@ requestPageFull = function() {
     return;
   }
 
+  var message = '試下Server ' + lmServer + ' 先<img src="faces/angel.gif" />';
+  changeAndFlashMessage(message);
+
   retriedCount++;
   var requestUrl = window.location.href.replace(/forum\d/, 'forum' + lmServer);
   ajaxRequest = GM_xmlhttpRequest({
@@ -68,8 +71,16 @@ requestPageFull = function() {
     url: requestUrl,
     timeout: ajaxTimeout,
     headers: {'Content-type': 'application/x-www-form-urlencoded'},
-    onload: function(response) {ajaxRequest = null; if(replaceContent(response)) storeStatus();},
-    onerror: function(response) {ajaxRequest = null; handleError(); },
+    onload: function(response) {
+        ajaxRequest = null;
+        clearTimeout(ajaxRequestTimer);
+        if(replaceContent(response)) storeStatus();
+      },
+    onerror: function(response) {
+        ajaxRequest = null;
+        clearTimeout(ajaxRequestTimer);
+        handleError();
+      },
     ontimeout: handleTimeout
   });
 
@@ -92,6 +103,9 @@ initPagePartial = function() {
 }
 
 requestPagePartial = function(page) {
+  var message = '試下Server ' + lmServer + ' 先<img src="faces/angel.gif" />';
+  changeAndFlashMessage(message);
+
   var requestUrl = window.location.href.replace(/forum\d/, 'forum' + lmServer);
   var data = $j.param({
           'ctl00$ScriptManager1': 'ctl00$ScriptManager1|ctl00$ContentPlaceHolder1$btn_GoPageNo',
@@ -109,8 +123,16 @@ requestPagePartial = function(page) {
     data: data,
     timeout: ajaxTimeout,
     headers: {'Content-type': 'application/x-www-form-urlencoded'},
-    onload: function(response) {ajaxRequest = null; if(replacePartialContent(response)) storeStatus();},
-    onerror: function(response) {ajaxRequest = null; handleError(); },
+    onload: function(response) {
+        ajaxRequest = null;
+        clearTimeout(ajaxRequestTimer);
+        if(replacePartialContent(response)) storeStatus();
+      },
+    onerror: function(response) {
+        ajaxRequest = null;
+        clearTimeout(ajaxRequestTimer);
+        handleError();
+      },
     ontimeout: handleTimeout
   });
 
@@ -224,7 +246,7 @@ handleError = function() {
 }
 
 tooManyRetryError = function() {
-  var message = '唔知咩事試過幾個Server都唔得<img src="faces/sosad.gif" />';
+  var message = '唔知咩事試過曬幾個Server都唔得<img src="faces/sosad.gif" />';
 
   changeAndFlashMessage(message);
 }
@@ -254,15 +276,33 @@ replaceButton = function() {
 
 // Logout if the target server is loged in
 logout = function(serverNumber) {
+
+  var message = '登出緊Server ' + lmServer + ' <img src="faces/angel.gif" />';
+  changeAndFlashMessage(message);
+
+  console.log('Try to logout server '+ lmServer);
   var requestUrl = 'http://forum' + lmServer + '.hkgolden.com/logout.aspx';
-  $j.ajax({
+
+  ajaxRequest = GM_xmlhttpRequest({
+    method: 'HEAD',
     url: requestUrl,
-    type: 'GET',
-    cache: false,
-    dataType: 'html',
-    success: [requestPageFull, function(){console.log('logout server: ' + lmServer)}],
-    error: handleError
+    timeout: ajaxTimeout,
+    headers: {'Content-type': 'application/x-www-form-urlencoded'},
+    onload: function(response) {
+        ajaxRequest = null;
+        clearTimeout(ajaxRequestTimer);
+        console.log('logout server: ' + lmServer); requestPageFull();
+      },
+    onerror: function(response) {
+        ajaxRequest = null;
+        clearTimeout(ajaxRequestTimer);
+        handleError();
+      },
+    ontimeout: handleTimeout
   });
+
+  // Specical handling for TamperMonkey
+  if(TM_xmlhttpRequest) timeoutRequest();
 }
 
 // Store the target page number in cookie
