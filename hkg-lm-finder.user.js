@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        1.0.1
+// @version        1.1.0
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
@@ -57,14 +57,12 @@ requestPageFull = function() {
   }
 
   var requestUrl = window.location.href.replace(/forum\d/, 'forum' + lmServer);
-  $j.ajax({
+  GM_xmlhttpRequest({
+    method: 'GET',
     url: requestUrl,
-    type: 'GET',
-    cache: false,
-    dataType: 'html',
-    success: replaceContent,
-    error: handleError,
-    complete: storeStatus
+    headers: {'Content-type': 'application/x-www-form-urlencoded'},
+    onload: function(response) {replaceContent(response); storeStatus();},
+    onerror: function(response) {handleError(); storeStatus();}
   });
 }
 
@@ -84,7 +82,7 @@ initPagePartial = function() {
 
 requestPagePartial = function(page) {
   var requestUrl = window.location.href.replace(/forum\d/, 'forum' + lmServer);
-  var data = {
+  var data = $j.param({
           'ctl00$ScriptManager1': 'ctl00$ScriptManager1|ctl00$ContentPlaceHolder1$btn_GoPageNo',
           'ctl00_ContentPlaceHolder1_tc_Profile_ClientState': '{"ActiveTabIndex":0,"TabState":[true,true,true]}',
           '__VIEWSTATE': viewState,
@@ -92,16 +90,15 @@ requestPagePartial = function(page) {
           'ctl00$ContentPlaceHolder1$PageNoTextBox': page,
           '__ASYNCPOST': true,
                'ctl00$ContentPlaceHolder1$btn_GoPageNo': 'Go'
-             }
-  $j.ajax({
+         });
+
+  GM_xmlhttpRequest({
+    method: 'POST',
     url: requestUrl,
-    type: 'POST',
-    cache: false,
     data: data,
-    dataType: 'html',
-    success: replacePartialContent,
-    error: handleError,
-    complete: storeStatus
+    headers: {'Content-type': 'application/x-www-form-urlencoded'},
+    onload: function(response) {replacePartialContent(response); storeStatus();},
+    onerror: function(response) {handleError(); storeStatus();}
   });
 }
 
@@ -119,13 +116,13 @@ storeStatus = function() {
 }
 
 // Search LM data in full page and insert
-replaceContent = function(data) {
-  if(!data || data.length === 0) {
+replaceContent = function(response) {
+  if(!response.responseText || response.responseText.length === 0) {
     handleError();
     return;
   }
 
-  var html = $j.parseHTML(data);
+  var html = $j.parseHTML(response.responseText);
   var history;
   var bookmark;
   $j.each( html, function( i, el ) {
@@ -150,18 +147,22 @@ replaceContent = function(data) {
 }
 
 // Search LM data in partial page and insert
-replacePartialContent = function(data) {
-  if(!data || data.length === 0) {
+replacePartialContent = function(response) {
+  if(!response.responseText || response.responseText.length === 0) {
     handleError();
     return;
   }
+  if(response.responseText.indexOf('<!DOCTYPE html') >= 0) {
+    replaceContent(response);
+    return;
+  }
 
-  var startPos = data.indexOf('<div');
-  var endPos = data.lastIndexOf('/table>');
+  var startPos = response.responseText.indexOf('<div');
+  var endPos = response.responseText.lastIndexOf('/table>');
   if(startPos < 0 || endPos < 0) return;
   
   endPos = endPos + '/table>'.length;
-  var slicedData = data.slice(startPos, endPos);
+  var slicedData = response.responseText.slice(startPos, endPos);
   $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html(slicedData);
   replaceButton();
   logoutCount = 0;
@@ -238,7 +239,7 @@ getCookie = function(c_name) {
 }
 
 flashMessage = function(item) {
-  item.animate({"opacity": "0"},10).animate({"opacity": "1"},10, function(){flashMessage(item);});
+  item.animate({"opacity": "0"},50).animate({"opacity": "1"},50, function(){flashMessage(item);});
 }
 
 setup = function() {
@@ -247,7 +248,7 @@ setup = function() {
   flashMessage(message);
 }
 
-$j(document).ready(function() {
+start = function() {
   var bookmark = $j('div#ctl00_ContentPlaceHolder1_bookmarkPanel');
   if(bookmark.length === 0) return;
 
@@ -259,4 +260,6 @@ $j(document).ready(function() {
     initPageFull();
     requestPageFull();
   }
-});
+}
+
+start();
