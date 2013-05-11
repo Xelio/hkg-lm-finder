@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        1.2.2
+// @version        2.0.0
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
@@ -61,7 +61,7 @@ requestPageFull = function() {
     return;
   }
 
-  var message = '試下Server ' + lmServer + ' 先<img src="faces/angel.gif" />';
+  var message = '等我試下Server ' + lmServer + ' 先<img src="faces/angel.gif" />';
   changeAndFlashMessage(message);
 
   retriedCount++;
@@ -92,7 +92,7 @@ requestPageFull = function() {
 initPagePartial = function() {
   lmServer = GM_getValue('lm_server');
   viewState = GM_getValue('viewstate');
-  changePage = getCookie('lm_change_page') || 1;
+  changePage = parseInt(loadLocal('lm_change_page')) || 1;
 
   // viewState may outdated, so change to full page loading if viewState is too old
   var currTimestamp = new Date().getTime();
@@ -103,18 +103,20 @@ initPagePartial = function() {
 }
 
 requestPagePartial = function(page) {
-  var message = '試下Server ' + lmServer + ' 先<img src="faces/angel.gif" />';
+  var message = '等我試下Server ' + lmServer + ' 先<img src="faces/angel.gif" />';
   changeAndFlashMessage(message);
 
   var requestUrl = window.location.href.replace(/forum\d+/, 'forum' + lmServer);
   var data = $j.param({
-          'ctl00$ScriptManager1': 'ctl00$ScriptManager1|ctl00$ContentPlaceHolder1$btn_GoPageNo',
+          'ctl00$ScriptManager1': 'ctl00$ScriptManager1|ctl00$ContentPlaceHolder1$mainTab$mainTab1$btn_GoPageNo',
           'ctl00_ContentPlaceHolder1_tc_Profile_ClientState': '{"ActiveTabIndex":0,"TabState":[true,true,true]}',
+          'ctl00_ContentPlaceHolder1_mainTab_ClientState': '{"ActiveTabIndex":0,"TabState":[true,true]}',
           '__VIEWSTATE': viewState,
-          'ctl00$ContentPlaceHolder1$ddl_filter_year': 1,
-          'ctl00$ContentPlaceHolder1$PageNoTextBox': page,
+          'ctl00$ContentPlaceHolder1$mainTab$mainTab1$ddl_filter_year': 1,
+          'ctl00$ContentPlaceHolder1$mainTab$mainTab1$filter_type': 'all',
+          'ctl00$ContentPlaceHolder1$mainTab$mainTab1$PageNoTextBox': page,
           '__ASYNCPOST': true,
-               'ctl00$ContentPlaceHolder1$btn_GoPageNo': 'Go'
+          'ctl00$ContentPlaceHolder1$mainTab$mainTab1$btn_GoPageNo': 'Go'
          });
 
   ajaxRequest = GM_xmlhttpRequest({
@@ -142,12 +144,13 @@ requestPagePartial = function(page) {
 
 // Store values needed for changing page
 storeStatus = function() {
-  window.LM_CURRENT_PAGE = parseInt($j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #ctl00_ContentPlaceHolder1_PageNoTextBox').val());
+  var history = $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory');
+  window.LM_CURRENT_PAGE = parseInt(history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_PageNoTextBox').val());
   GM_setValue('lm_server', lmServer);
   GM_setValue('viewstate', viewState);
   GM_setValue('lm_last_timestamp', new Date().getTime());
 
-  document.cookie = 'lm_change_page=' + window.LM_CURRENT_PAGE;
+  storeLocal('lm_change_page', window.LM_CURRENT_PAGE);
 
   console.log('lm server: ' + lmServer);
   console.log('lm page: ' + window.LM_CURRENT_PAGE);
@@ -155,6 +158,7 @@ storeStatus = function() {
 
 // Search LM data in full page and insert
 replaceContent = function(response) {
+  clearMessage();
   if(!response.responseText || response.responseText.length === 0) {
     handleError();
     return false;
@@ -162,20 +166,19 @@ replaceContent = function(response) {
 
   var html = $j.parseHTML(response.responseText);
   var history;
-  var bookmark;
   $j.each( html, function( i, el ) {
     if(el.id === 'aspnetForm') {
       var doms = $j(el);
       viewState = doms.find('#__VIEWSTATE').val();
-      history = doms.find('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory');
-      bookmark = doms.find('div#ctl00_ContentPlaceHolder1_bookmarkPanel');
+      history = doms.find('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory');
       return false;
     }
   });
 
-  if(bookmark.length === 0) {
-    $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html(history.html());
+  if(history.length !== 0) {
+    $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory').html(history.html());
     replaceButton();
+    $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab0').css('visibility', 'hidden').css('display', 'none');
     retriedCount = 0;
     console.log('full request finished');
   } else {
@@ -187,6 +190,7 @@ replaceContent = function(response) {
 
 // Search LM data in partial page and insert
 replacePartialContent = function(response) {
+  clearMessage();
   if(!response.responseText || response.responseText.length === 0) {
     handleError();
     return false;
@@ -194,7 +198,7 @@ replacePartialContent = function(response) {
   if(response.responseText.indexOf('<!DOCTYPE html') >= 0) {
     return replaceContent(response);
   }
-  if(response.responseText.indexOf('ctl00_ContentPlaceHolder1_UpdatePanelHistory') === -1) {
+  if(response.responseText.indexOf('ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory') === -1) {
     handleError();
     return false;
   }
@@ -210,8 +214,9 @@ replacePartialContent = function(response) {
   var slicedData = response.responseText.slice(startPos, endPos);
   viewState = response.responseText.match(/\|__VIEWSTATE\|.*?\|/gm)[0].replace(/\|__VIEWSTATE\|/gm, '').replace(/\|/gm, '') || viewState;
 
-  $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html(slicedData);
+  $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory').html(slicedData);
   replaceButton();
+  $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab0').css('visibility', 'hidden').css('display', 'none');
   retriedCount = 0;
   console.log('partial request finished');
   return true;
@@ -246,7 +251,7 @@ handleError = function() {
 }
 
 tooManyRetryError = function() {
-  var message = '唔知咩事試過曬幾個Server都唔得<img src="faces/sosad.gif" />';
+  var message = '唔知咩事試過曬幾個Server都唔得, 你Reload下啦<img src="faces/sosad.gif" />';
 
   changeAndFlashMessage(message);
 }
@@ -262,16 +267,28 @@ changeServer = function() {
 }
 
 changeAndFlashMessage = function(message) {
-  $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory').html('<div id="message">'+message+'</div>');
-  var messageDiv = $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #message');
+  var messageDiv = $j('div#lm_message');
+  messageDiv.html(message);
   flashMessage(messageDiv);
+}
+
+clearMessage = function() {
+  var messageDiv = $j('div#lm_message');
+  messageDiv.html('');
+  messageDiv.stop();
+}
+
+flashMessage = function(item) {
+  item.stop();
+  item.animate({"opacity": "0"},50).animate({"opacity": "1"},50, function(){flashMessage(item);});
 }
 
 // Change button event, let this script handle page changing
 replaceButton = function() {
-  $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #ctl00_ContentPlaceHolder1_btn_Next').click(nextPage);
-  $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #ctl00_ContentPlaceHolder1_btn_Previous').click(previousPage);
-  $j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #ctl00_ContentPlaceHolder1_btn_GoPageNo').click(gotoPage);
+  var history = $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory');
+  history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_btn_Next').click(nextPage);
+  history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_btn_Previous').click(previousPage);
+  history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_btn_GoPageNo').click(gotoPage);
 }
 
 // Logout if the target server is loged in
@@ -309,7 +326,7 @@ logout = function(serverNumber) {
 nextPage = function() {
   var page = window.LM_CURRENT_PAGE + 1;
   if(page === window.LM_CURRENT_PAGE) return false;
-  document.cookie = 'lm_change_page=' + page;
+  storeLocal('lm_change_page', page)
   location.reload();
   return false;
 }
@@ -317,57 +334,58 @@ nextPage = function() {
 previousPage = function() {
   var page = Math.max(window.LM_CURRENT_PAGE - 1, 1);
   if(page === window.LM_CURRENT_PAGE) return false;
-  document.cookie = 'lm_change_page=' + page;
+  storeLocal('lm_change_page', page)
   location.reload();
   return false;
 }
 
 gotoPage = function() {
-  var page = parseInt($j('div#ctl00_ContentPlaceHolder1_UpdatePanelHistory #ctl00_ContentPlaceHolder1_PageNoTextBox').val());
+  var history = $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory');
+  var page = parseInt(history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_PageNoTextBox').val());
   if(page === window.LM_CURRENT_PAGE) return false;
-  document.cookie = 'lm_change_page=' + page;
+  storeLocal('lm_change_page', page)
   location.reload();
   return false;
 }
 
-deleteCookie = function(c_name) {
-  document.cookie = c_name + '=;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+storeLocal = function(key, value) {
+  localStorage[key] = JSON.stringify(value);
 }
 
-getCookie = function(c_name) {
-  var c_value = document.cookie;
-  var c_start = c_value.indexOf(" " + c_name + "=");
-  if (c_start == -1) {
-    c_start = c_value.indexOf(c_name + "=");
-  }
-  if (c_start == -1) {
-    c_value = null;
-  } else {
-    c_start = c_value.indexOf("=", c_start) + 1;
-    var c_end = c_value.indexOf(";", c_start);
-    if (c_end == -1) {
-      c_end = c_value.length;
-    }
-    c_value = unescape(c_value.substring(c_start,c_end));
-  }
-  return c_value;
+loadLocal = function(key) {
+  var objectJSON = localStorage[key];
+  if(!objectJSON) return;
+  return JSON.parse(objectJSON);
 }
 
-flashMessage = function(item) {
-  item.animate({"opacity": "0"},50).animate({"opacity": "1"},50, function(){flashMessage(item);});
+deleteLocal = function(key) {
+  localStorage.remoteItem(key);
+}
+
+clearOldCookie = function() {
+  if(!loadLocal('cookie_cleared')) {
+    document.cookie = 'lm_change_page=;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    storeLocal('cookie_cleared', true);
+  }
 }
 
 setup = function() {
   availableServer = servers;
-  $j('<div id="ctl00_ContentPlaceHolder1_UpdatePanelHistory"><div id="message"></div></div><br />').insertBefore('div#ctl00_ContentPlaceHolder1_UpdatePanelPM');
+  $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1').remove();
+  $j('span#ctl00_ContentPlaceHolder1_mainTab_mainTab1_tab').remove();
 
+  $j('<div id="ctl00_ContentPlaceHolder1_mainTab_mainTab1"></div><br />').insertBefore('div#ctl00_ContentPlaceHolder1_mainTab');
+  $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1').html('<div>起底</div><div id="ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory"></div>');
+
+  $j('<div id="lm_message"></div>').insertBefore('div#ctl00_ContentPlaceHolder1_mainTab');
   var message = 'Load緊呀等陣啦<img src="faces/angel.gif" />';
   changeAndFlashMessage(message);
 }
 
 start = function() {
-  var bookmark = $j('div#ctl00_ContentPlaceHolder1_bookmarkPanel');
-  if(bookmark.length === 0) return;
+  clearOldCookie();
+  var history = $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory');
+  if(history.length === 1) return;
 
   setup();
 
