@@ -1,7 +1,8 @@
 HKGolden LM finder
 =============
 
-Let you find the post you replied or LMed in your profile page. 
+Let you find the post you replied or LMed in your profile page.
+
 Please note that this script may logout to get the history page and popup a login page to let you login again. This is required because admin sync the login status between all servers.
 
 ## How to install?
