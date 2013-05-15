@@ -18,3 +18,4 @@ Let you find the post you replied or LMed in your profile page.
 # Safari (I don't know whether this work or not)
 1. Install [Ninjakit](LINK:http://ss-o.net/safari/extension/NinjaKit.safariextz)
 2. Open (https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js)
+3. Copy the content of the js file to Ninjakit
