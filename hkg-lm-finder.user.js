@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        3.0.0
+// @version        3.1.0
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 var $j = jQuery.noConflict();
 
 var currentServer;
-var servers = [1,2,3,4,5,6,7,8];
+var servers;
 var availableServer;
 var viewStateOutdate = 15 * 60 * 1000;
 var ajaxTimeout = 15000;
@@ -46,7 +46,7 @@ var viewState;
 var changePage;
 var changeFilterType;
 
-var partialRequestFailed = false;
+var useFullRequest = false;
 var loggedOut = false;
 
 // Monitor window.LM_CHANGE_PAGE and window.LM_CHANGE_FILTER_TYPE and fire
@@ -75,16 +75,13 @@ pageChangeByAjax = function() {
 // Init options for full page loading
 initPageFull = function() {
   // Randomly choose a server other than the server which user is currently using
-  availableServer = $j.grep(availableServer, function(value) { return value != currentServer });
-  lmServer = availableServer[Math.floor(Math.random()*availableServer.length)];
+  lmServer = availableServer.pop();
   viewState = null;
 }
 
 // Init options for partial page loading
 initPagePartial = function() {
-  availableServer = $j.grep(servers, function(value) { return value != currentServer });
-
-  lmServer = GM_getValue('lm_server');
+  lmServer = availableServer.pop();
   viewState = GM_getValue('viewstate');
   changePage = parseInt(loadLocal('lm_change_page')) || 1;
   changeFilterType = loadLocal('lm_filter_type') || 'all';
@@ -97,10 +94,10 @@ requestProfilePage = function(page, filter_type) {
   var requestType = (page ? 'partial' : 'full');
   var requestParm;
 
-  var message = '等我試下Server ' + lmServer + ' 先<img src="faces/angel.gif" />';
+  var message = '等我試下Server "' + lmServer + '" 先<img src="faces/angel.gif" />';
   changeAndFlashMessage(message);
 
-  var requestUrl = window.location.href.replace(/forum\d+/, 'forum' + lmServer);
+  var requestUrl = window.location.href.replace(/forum\d+/, lmServer);
 
   var requestParmShared = {
     url: requestUrl,
@@ -113,6 +110,8 @@ requestProfilePage = function(page, filter_type) {
           storeStatus();
           popupLoginWindow();
           setTimeout(pageChangeByAjax, 200);
+        } else {
+          handleError();
         }
       },
     onerror: function(response) {
@@ -159,7 +158,6 @@ replaceContent = function(response) {
   if(!data || (data.length === 0)
       || (data.indexOf('ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory') === -1)) {
     // No history in data response
-    handleError();
     return false;
   }
 
@@ -186,16 +184,13 @@ replaceContent = function(response) {
     });
   }
 
-  if(history.length !== 0) {
-    $j('div#lm_history').html(history.html());
-    replaceButton();
+  if(history.length === 0) return false;
 
-    console.log(partialResponse ? 'partial request finished' : 'full request finished');
-    partialRequestFailed = false;
-  } else {
-    handleError();
-    return false;
-  }
+  $j('div#lm_history').html(history.html());
+  replaceButton();
+
+  console.log(partialResponse ? 'partial request finished' : 'full request finished');
+  useFullRequest = false;
   return true;
 }
 
@@ -205,12 +200,13 @@ storeStatus = function() {
   window.LM_CURRENT_PAGE = parseInt(history.find('#lm_PageNoTextBox').val());
   window.LM_FILTER_TYPE = history.find('#lm_filter_type').val()
 
-  GM_setValue('lm_server', lmServer);
   GM_setValue('viewstate', viewState);
   GM_setValue('lm_last_timestamp', (new Date().getTime()).toString());
 
   storeLocal('lm_change_page', window.LM_CURRENT_PAGE);
   storeLocal('lm_filter_type', window.LM_FILTER_TYPE);
+
+  availableServer = $j.grep(servers, function(value) { return value != currentServer });
 
   console.log('lm server: ' + lmServer);
   console.log('lm page: ' + window.LM_CURRENT_PAGE);
@@ -219,11 +215,11 @@ storeStatus = function() {
 // Logout if the target server is logged in
 logout = function() {
 
-  var message = '登出緊Server <img src="faces/angel.gif" />';
+  var message = '登出緊<img src="faces/angel.gif" />';
   changeAndFlashMessage(message);
 
   console.log('Try to logout server');
-  var requestUrl = 'http://forum' + currentServer + '.hkgolden.com/logout.aspx';
+  var requestUrl = 'http://' + currentServer + '.hkgolden.com/logout.aspx';
 
   ajaxRequest = GM_xmlhttpRequest({
     method: 'HEAD',
@@ -262,7 +258,7 @@ popupLoginWindow = function() {
   var message = '登出左, 開左登入晝面比你登入返<img src="faces/angel.gif" />';
   changeAndFlashMessage(message);
 
-  var Url = 'http://forum' + currentServer + '.hkgolden.com/login.aspx';
+  var Url = 'http://' + currentServer + '.hkgolden.com/login.aspx';
   var loginWindow = window.open(Url, 'hkg_login')
   setTimeout(function() {checkPopupLogined(loginWindow)}, 200);
 }
@@ -322,22 +318,26 @@ tooManyRetryError = function() {
 }
 
 changeServer = function() {
-  availableServer = $j.grep(availableServer, function(value) { return value !== lmServer });
-
-  if(availableServer.length < 5 && !partialRequestFailed) {
+  // Tried partial request a few times, change to full request
+  if(availableServer.length < 5 && !useFullRequest) {
     availableServer = $j.grep(servers, function(value) { return value !== currentServer });
-    partialRequestFailed = true;
+    useFullRequest = true;
     logout();
     return;
   }
 
-  if(availableServer.length === 0 && partialRequestFailed) {
+  // Tried full request on all servers
+  if(availableServer.length === 0 && useFullRequest) {
     tooManyRetryError();
     return;
   }
 
-  initPageFull();
-  requestProfilePage();
+  if(!useFullRequest && initPagePartial()) {
+    requestProfilePage(changePage);
+  } else {
+    initPageFull();
+    requestProfilePage();
+  }
 }
 
 changeAndFlashMessage = function(message) {
@@ -438,9 +438,19 @@ clearOldCookie = function() {
   }
 }
 
+shuffle = function(arr) {
+  for(
+    var j, x, i = arr.length; i;
+    j = Math.random() * i|0,
+    x = arr[--i], arr[i] = arr[j], arr[j] = x
+  );
+  return arr;
+}
+
 setup = function() {
-  currentServer = parseInt(window.location.href.match(/forum(\d+)/)[1]);
-  availableServer = servers;
+  servers = $j.map(shuffle([1,2,3,4,5,6,7,8]), function(n, i) {return 'forum' + n;}).concat(['search']);
+  currentServer = window.location.href.match(/forum\d+/)[0];
+  availableServer = $j.grep(servers, function(value) { return value != currentServer });
   $j('<div id="lm"></div><br />').insertBefore('div#ctl00_ContentPlaceHolder1_mainTab');
   $j('div#lm').html('<div>起底</div><div id="lm_history"></div>');
 
