@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        3.1.0
+// @version        3.2.0
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
+// @include        http://search.hkgolden.com/ProfilePage.aspx?userid=*
 // @match          http://*.hkgolden.com/ProfilePage.aspx?userid=*
 // @require        http://code.jquery.com/jquery-1.9.1.min.js
 // @grant          GM_getValue
@@ -97,7 +98,7 @@ requestProfilePage = function(page, filter_type) {
   var message = '等我試下Server "' + lmServer + '" 先<img src="faces/angel.gif" />';
   changeAndFlashMessage(message);
 
-  var requestUrl = window.location.href.replace(/forum\d+/, lmServer);
+  var requestUrl = window.location.href.replace(/(forum\d+|search)/, lmServer);
 
   var requestParmShared = {
     url: requestUrl,
@@ -449,7 +450,7 @@ shuffle = function(arr) {
 
 setup = function() {
   servers = $j.map(shuffle([1,2,3,4,5,6,7,8]), function(n, i) {return 'forum' + n;}).concat(['search']);
-  currentServer = window.location.href.match(/forum\d+/)[0];
+  currentServer = window.location.href.match(/(forum\d+|search)/)[0];
   availableServer = $j.grep(servers, function(value) { return value != currentServer });
   $j('<div id="lm"></div><br />').insertBefore('div#ctl00_ContentPlaceHolder1_mainTab');
   $j('div#lm').html('<div>起底</div><div id="lm_history"></div>');
