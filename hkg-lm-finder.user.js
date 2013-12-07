@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        4.0.0
+// @version        4.0.1
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
@@ -11,7 +11,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @copyright      2013, Xelio
+// @copyright      2013, Xelio, Peach(Fix of PM, 紅人榜)
 // ==/UserScript==
 
 /*
@@ -205,7 +205,7 @@ replaceContent = function(response) {
 storeStatus = function() {
   var history = $j('div#lm_history');
   window.LM_CURRENT_PAGE = parseInt(history.find('#lm_PageNoTextBox').val());
-  window.LM_FILTER_TYPE = history.find('#lm_filter_type').val()
+  window.LM_FILTER_TYPE = history.find('#lm_filter_type').val();
 
   GM_setValue('viewstate', viewState);
   GM_setValue('eventvalidation', eventValidation);
@@ -395,6 +395,10 @@ replaceButton = function() {
       .attr('name', 'lm_filter_type')
       .attr('onchange', '')
       .change(changeFilter);
+  history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_ddl_filter_year')
+      .attr('id', 'lm_filter_year')
+      .attr('name', 'lm_filter_year')
+      .attr('onchange', '');
   history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_PageNoTextBox')
       .attr('id', 'lm_PageNoTextBox')
       .attr('name', 'lm_PageNoTextBox');
