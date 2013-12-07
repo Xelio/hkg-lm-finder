@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        3.2.0
+// @version        4.0.0
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/ProfilePage.aspx?userid=*
@@ -43,6 +43,7 @@ var ajaxRequest;
 var ajaxRequestTimer;
 var lmServer;
 var viewState;
+var eventValidation;
 
 var changePage;
 var changeFilterType;
@@ -78,16 +79,18 @@ initPageFull = function() {
   // Randomly choose a server other than the server which user is currently using
   lmServer = availableServer.pop();
   viewState = null;
+  eventValidation = null;
 }
 
 // Init options for partial page loading
 initPagePartial = function() {
   lmServer = availableServer.pop();
   viewState = GM_getValue('viewstate');
+  eventValidation = GM_getValue('eventvalidation');
   changePage = parseInt(loadLocal('lm_change_page')) || 1;
   changeFilterType = loadLocal('lm_filter_type') || 'all';
 
-  if(!lmServer || !viewState || !changePage) return false;
+  if(!lmServer || !viewState || !eventValidation || !changePage) return false;
   return true;
 }
 
@@ -132,6 +135,7 @@ requestProfilePage = function(page, filter_type) {
           'ctl00$ContentPlaceHolder1$mainTab$mainTab1$ddl_filter_year': 1,
           'ctl00$ContentPlaceHolder1$mainTab$mainTab1$filter_type': (filter_type || 'all'),
           'ctl00$ContentPlaceHolder1$mainTab$mainTab1$PageNoTextBox': page,
+          '__EVENTVALIDATION': eventValidation,
           '__ASYNCPOST': true,
           'ctl00$ContentPlaceHolder1$mainTab$mainTab1$btn_GoPageNo': 'Go'
          });
@@ -172,6 +176,7 @@ replaceContent = function(response) {
       endPos = endPos + '/table>'.length;
       history = $j('<div></div>').html(data.slice(startPos, endPos));
       viewState = data.match(/\|__VIEWSTATE\|.*?\|/gm)[0].replace(/\|__VIEWSTATE\|/gm, '').replace(/\|/gm, '') || viewState;
+      eventValidation = data.match(/\|__EVENTVALIDATION\|.*?\|/gm)[0].replace(/\|__EVENTVALIDATION\|/gm, '').replace(/\|/gm, '') || eventValidation;
     }
   } else {
     // Find history and viewState in full response
@@ -179,6 +184,7 @@ replaceContent = function(response) {
       if(el.id === 'aspnetForm') {
         var doms = $j(el);
         viewState = doms.find('#__VIEWSTATE').val();
+        eventValidation = doms.find('#__EVENTVALIDATION').val();
         history = doms.find('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory');
         return false;
       }
@@ -202,6 +208,7 @@ storeStatus = function() {
   window.LM_FILTER_TYPE = history.find('#lm_filter_type').val()
 
   GM_setValue('viewstate', viewState);
+  GM_setValue('eventvalidation', eventValidation);
   GM_setValue('lm_last_timestamp', (new Date().getTime()).toString());
 
   storeLocal('lm_change_page', window.LM_CURRENT_PAGE);
@@ -266,15 +273,25 @@ popupLoginWindow = function() {
 
 // Check login popup window status and close it if logined 
 checkPopupLogined = function(targetWindow) {
-  var logoutLink = $j(targetWindow.document).find('a[href="javascript:islogout();"]');
-  if(logoutLink.length !== 0) {
-    console.log('popup logined');
-    targetWindow.close();
-    loggedOut = false;
+  try {
+    var logoutLink = $j(targetWindow.document).find('a[href="javascript:islogout();"]');
+    if(logoutLink.length !== 0) {
+      console.log('popup logined');
+      targetWindow.close();
+      loggedOut = false;
 
-    clearMessage();
-  } else {
-    setTimeout(function() {checkPopupLogined(targetWindow)}, 200);
+      clearMessage();
+    } else {
+      setTimeout(function() {checkPopupLogined(targetWindow)}, 200);
+    }
+  } catch(err) {
+    // Chrome only
+    if(err.name = 'SecurityError')
+    {
+      console.log(err);
+      setTimeout(function() {checkPopupLogined(targetWindow)}, 1000);
+      console.log('Wait 1 second to determine user has login or not');
+    }
   }
 }
 
