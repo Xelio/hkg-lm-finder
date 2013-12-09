@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        5.0.0
+// @version        5.0.1
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
-// @include        http://profile.hkgolden.com/ProfilePage.aspx?userid=*
-// @match          http://profile.hkgolden.com/ProfilePage.aspx?userid=*
+// @include        http://profile.hkgolden.com/profilepage.aspx?userid=*
+// @match          http://profile.hkgolden.com/profilepage.aspx?userid=*
 // @require        http://code.jquery.com/jquery-1.9.1.min.js
 // @grant          GM_getValue
 // @grant          GM_setValue
