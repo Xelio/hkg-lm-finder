@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        5.0.1
+// @version        5.0.2
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
+// @include        http://forum*.hkgolden.com/profilepage.aspx?userid=*
 // @include        http://profile.hkgolden.com/profilepage.aspx?userid=*
-// @match          http://profile.hkgolden.com/profilepage.aspx?userid=*
+// @match          http://*.hkgolden.com/profilepage.aspx?userid=*
 // @require        http://code.jquery.com/jquery-1.9.1.min.js
 // @grant          GM_getValue
 // @grant          GM_setValue
@@ -226,7 +227,7 @@ logout = function() {
   changeAndFlashMessage(message);
 
   console.log('Try to logout');
-  var requestUrl = 'http://search.hkgolden.com/logout.aspx';
+  var requestUrl = 'http://' + window.location.hostname + '/logout.aspx';
 
   ajaxRequest = GM_xmlhttpRequest({
     method: 'HEAD',
@@ -266,7 +267,7 @@ popupLoginWindow = function() {
   var message = '登出左, 開左登入晝面比你登入返<img src="faces/angel.gif" />';
   changeAndFlashMessage(message);
 
-  var Url = 'http://profile.hkgolden.com/login.aspx';
+  var Url = 'http://' + window.location.hostname + '/login.aspx';
   var loginWindow = window.open(Url, 'hkg_login')
   setTimeout(function() {checkPopupLogined(loginWindow)}, 200);
 }
