@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        5.0.2
+// @version        5.1.0
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/profilepage.aspx?userid=*
@@ -128,10 +128,27 @@ requestProfilePage = function(page, filter_type) {
           'ctl00$ScriptManager1': 'ctl00$ScriptManager1|ctl00$ContentPlaceHolder1$mainTab$mainTab1$btn_GoPageNo',
           'ctl00_ContentPlaceHolder1_tc_Profile_ClientState': '{"ActiveTabIndex":0,"TabState":[true,true,true]}',
           'ctl00_ContentPlaceHolder1_mainTab_ClientState': '{"ActiveTabIndex":0,"TabState":[true,true]}',
-          '__VIEWSTATE': viewState,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb0$txt_nickname': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb0$txt_reli': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb0$txt_website': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb1$ddl_re_status': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb1$txt_lookingfor': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_fav': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_favsports': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_favmusic': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_favbooks': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_favmovies': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_favquotes': null,
+          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_abtme': null,
           'ctl00$ContentPlaceHolder1$mainTab$mainTab1$ddl_filter_year': 1,
           'ctl00$ContentPlaceHolder1$mainTab$mainTab1$filter_type': (filter_type || 'all'),
           'ctl00$ContentPlaceHolder1$mainTab$mainTab1$PageNoTextBox': page,
+          'ctl00$ContentPlaceHolder1$GiftBeerTextBox': null,
+          'ctl00$ContentPlaceHolder1$GiftKauTextBox': null,
+          '__EVENTTARGET': null,
+          '__EVENTARGUMENT': null,
+          '__LASTFOCUS': null,
+          '__VIEWSTATE': viewState,
           '__EVENTVALIDATION': eventValidation,
           '__ASYNCPOST': true,
           'ctl00$ContentPlaceHolder1$mainTab$mainTab1$btn_GoPageNo': 'Go'
