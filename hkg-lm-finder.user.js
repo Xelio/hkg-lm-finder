@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        6.0.0
+// @version        6.0.1
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/profilepage.aspx?userid=*
@@ -34,6 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 var $j = jQuery.noConflict();
 
+var servers;
+var selectedServer;
+
 var ajaxTimeout = 30000;
 var ajaxRequest;
 var ajaxRequestTimer;
@@ -59,7 +62,9 @@ var RED_PEOPLE_POUND_SELECTOR = '#ctl00_ContentPlaceHolder1_mp4';
 
 var WEB_PROXY_URL = 'http://hkg-lm-loader-1.xelio.ml/proxy/';
 var GetRequestURL = function(page, filter_type) {
-  return WEB_PROXY_URL + window.location.href.replace(/\&.*/, '').replace(/^http:\/\//, '')+ '&type=history&page=' + (page || 1) + '&yearFilter=3&filterType=' + (filter_type || 'all');
+  return WEB_PROXY_URL
+  		+ selectedServer + '.hkgolden.com/ProfilePage.aspx?userid=' + window.location.href.match(/userid=(\d+)/)[1]
+  		+ '&type=history&page=' + (page || 1) + '&yearFilter=3&filterType=' + (filter_type || 'all');
 }
 
 // Monitor window.LM_CHANGE_PAGE and window.LM_CHANGE_FILTER_TYPE and fire
@@ -164,6 +169,7 @@ RetryRequest = function() {
   // Tried partial request a few times, change to full request
   if(retryCounter < MAX_RETRY) {
     retryCounter++;
+    selectedServer = servers.pop();
     requestProfilePage();
   } else {
     tooManyRetryError();
@@ -367,6 +373,8 @@ setupPageElement = function() {
 }
 
 start = function() {
+  servers = $j.map(shuffle([1,2,3,4,5,6,7,8,9,14,15]), function(n, i) {return 'forum' + n;});
+  selectedServer = servers.pop();
   var history = $j(HISTORY_SELECTOR);
   if(history.length === 1) return;
 
