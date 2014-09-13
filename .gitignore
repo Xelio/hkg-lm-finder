@@ -1,3 +1,9 @@
 *.class
 *.pyc
 *.pyo
+.sass-cache
+.#*
+#*#
+*~
+/env.rb
+.bundle/
