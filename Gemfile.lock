@@ -5,15 +5,9 @@ GEM
     daemons (1.1.9)
     eventmachine (1.0.3)
     excon (0.39.5)
-    haml (4.0.2)
-      tilt
-    mini_portile (0.6.0)
-    nokogiri (1.6.3.1)
-      mini_portile (= 0.6.0)
     rack (1.5.2)
     rack-protection (1.5.3)
       rack
-    sass (3.2.14)
     sinatra (1.4.5)
       rack (~> 1.4)
       rack-protection (~> 1.4)
@@ -30,8 +24,5 @@ PLATFORMS
 DEPENDENCIES
   addressable
   excon
-  haml
-  nokogiri
-  sass
   sinatra
   thin
