@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        5.1.0
+// @version        6.0.0
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/profilepage.aspx?userid=*
@@ -34,18 +34,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 var $j = jQuery.noConflict();
 
-var viewStateOutdate = 15 * 60 * 1000;
-var ajaxTimeout = 15000;
+var ajaxTimeout = 30000;
 var ajaxRequest;
 var ajaxRequestTimer;
-var viewState;
-var eventValidation;
 
 var changePage;
 var changeFilterType;
 
-var useFullRequest = false;
+var MAX_RETRY = 3;
+var retryCounter = 0;
 var needLogin = false;
+
+var HISTORY_ID = 'ctl00_ContentPlaceHolder1_mp3';
+var HISTORY_SELECTOR = 'span#' + HISTORY_ID;
+var GetHistory = function(element) { return element.find(HISTORY_SELECTOR).parent().parent().parent(); };
+
+var NEXT_BUTTON_SELECTOR = '#ctl00_ContentPlaceHolder1_nextBtn';
+var PREVIOUS_BUTTON_SELECTOR = '#ctl00_ContentPlaceHolder1_previousBtn';
+var GO_BUTTON_SELECTOR = '#ctl00_ContentPlaceHolder1_pageGoBtn';
+var FILTER_TYPE_SELECTOR = '#ctl00_ContentPlaceHolder1_filter_type';
+var FILTER_YEAR_SELECTOR = '#ctl00_ContentPlaceHolder1_ddl_filter_year';
+var PAGE_NO_TEXTBOX_SELECTOR = '#ctl00_ContentPlaceHolder1_pageTextBox';
+var RED_PEOPLE_POUND_SELECTOR = '#ctl00_ContentPlaceHolder1_mp4';
+
+var WEB_PROXY_URL = 'http://hkg-lm-loader-1.xelio.ml/proxy/';
+var GetRequestURL = function(page, filter_type) {
+  return WEB_PROXY_URL + window.location.href.replace(/\&.*/, '').replace(/^http:\/\//, '')+ '&type=history&page=' + (page || 1) + '&yearFilter=3&filterType=' + (filter_type || 'all');
+}
 
 // Monitor window.LM_CHANGE_PAGE and window.LM_CHANGE_FILTER_TYPE and fire
 // ajax request to change page or filter. 
@@ -54,7 +69,6 @@ var needLogin = false;
 pageChangeByAjax = function() {
   if((window.LM_CHANGE_PAGE && window.LM_CHANGE_PAGE !== window.LM_CURRENT_PAGE)
       ||(window.LM_CHANGE_FILTER_TYPE && window.LM_CHANGE_FILTER_TYPE !== window.LM_FILTER_TYPE)) {
-    initPagePartial();
 
     if(window.LM_CHANGE_PAGE) changePage = window.LM_CHANGE_PAGE;
     window.LM_CHANGE_PAGE = null;
@@ -74,42 +88,26 @@ pageChangeByAjax = function() {
   }
 }
 
-// Init options for full page loading
-initPageFull = function() {
-  viewState = null;
-  eventValidation = null;
-}
 
-// Init options for partial page loading
-initPagePartial = function() {
-  viewState = GM_getValue('viewstate');
-  eventValidation = GM_getValue('eventvalidation');
-  changePage = parseInt(loadLocal('lm_change_page')) || 1;
-  changeFilterType = loadLocal('lm_filter_type') || 'all';
 
-  if(!viewState || !eventValidation || !changePage) return false;
-  return true;
-}
-
+// request profile page to get history
 requestProfilePage = function(page, filter_type) {
-  var requestType = (page ? 'partial' : 'full');
-  var requestParm;
+  loadingMessage();
 
-  var message = 'Load 緊<img src="faces/angel.gif" />';
-  changeAndFlashMessage(message);
+  var requestUrl = GetRequestURL(page, filter_type);
+  console.log('request url: ' + requestUrl);
 
-  var requestUrl = window.location.href;
-
-  var requestParmShared = {
+  var requestParm = {
+    method: 'GET',
     url: requestUrl,
     timeout: ajaxTimeout,
     headers: {'Content-type': 'application/x-www-form-urlencoded'},
     onload: function(response) {
         ajaxRequest = null;
         clearTimeout(ajaxRequestTimer);
+      
         if(replaceContent(response)) {
           storeStatus();
-          popupLoginWindow();
           setTimeout(pageChangeByAjax, 200);
         } else {
           handleError();
@@ -118,55 +116,63 @@ requestProfilePage = function(page, filter_type) {
     onerror: function(response) {
         ajaxRequest = null;
         clearTimeout(ajaxRequestTimer);
+      
         handleError();
       },
     ontimeout: handleTimeout
   };
-
-  if(requestType === 'partial') {
-    var data = $j.param({
-          'ctl00$ScriptManager1': 'ctl00$ScriptManager1|ctl00$ContentPlaceHolder1$mainTab$mainTab1$btn_GoPageNo',
-          'ctl00_ContentPlaceHolder1_tc_Profile_ClientState': '{"ActiveTabIndex":0,"TabState":[true,true,true]}',
-          'ctl00_ContentPlaceHolder1_mainTab_ClientState': '{"ActiveTabIndex":0,"TabState":[true,true]}',
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb0$txt_nickname': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb0$txt_reli': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb0$txt_website': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb1$ddl_re_status': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb1$txt_lookingfor': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_fav': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_favsports': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_favmusic': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_favbooks': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_favmovies': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_favquotes': null,
-          'ctl00$ContentPlaceHolder1$tc_Profile$tb2$txt_abtme': null,
-          'ctl00$ContentPlaceHolder1$mainTab$mainTab1$ddl_filter_year': 1,
-          'ctl00$ContentPlaceHolder1$mainTab$mainTab1$filter_type': (filter_type || 'all'),
-          'ctl00$ContentPlaceHolder1$mainTab$mainTab1$PageNoTextBox': page,
-          'ctl00$ContentPlaceHolder1$GiftBeerTextBox': null,
-          'ctl00$ContentPlaceHolder1$GiftKauTextBox': null,
-          '__EVENTTARGET': null,
-          '__EVENTARGUMENT': null,
-          '__LASTFOCUS': null,
-          '__VIEWSTATE': viewState,
-          '__EVENTVALIDATION': eventValidation,
-          '__ASYNCPOST': true,
-          'ctl00$ContentPlaceHolder1$mainTab$mainTab1$btn_GoPageNo': 'Go'
-         });
-    var requestParmPartial = {method: 'POST', data: data};
-    requestParm = $j.extend({}, requestParmShared, requestParmPartial);
-  } else {
-    var requestParmFull = {method: 'GET'};
-    requestParm = $j.extend({}, requestParmShared, requestParmFull);
-  }
-
-  ajaxRequest = GM_xmlhttpRequest(requestParm);
-
-  // Specical handling for TamperMonkey
+  
+  // Specical timout handling for TamperMonkey
   if(typeof(TM_xmlhttpRequest) !== 'undefined') {
-    timeoutRequest(function() {handleTamperMonkeyTimeout(handleTimeout);});
+    clearTimeout(ajaxRequestTimer);
+    ajaxRequestTimer = setTimeout(handleTamperMonkeyTimeout, ajaxTimeout);
+  }
+  
+  console.log('Sending request.');
+  ajaxRequest = GM_xmlhttpRequest(requestParm);
+}
+
+
+
+// Error or timeout handling
+
+// Can't simply set 'timeout' value in GM_xmlhttpRequest as TamperMonkey do not support it
+handleTamperMonkeyTimeout = function() {
+  if(ajaxRequest && ajaxRequest.abort) {
+    ajaxRequest.abort();
+    handleTimeout();
   }
 }
+
+handleTimeout = function() {
+  timeoutMessage();
+  RetryRequest();
+}
+
+handleError = function() {
+  console.log('server error');
+  errorMessage();
+  RetryRequest();
+}
+
+tooManyRetryError = function() {
+  tooManyRetryMessage();
+}
+
+
+RetryRequest = function() {
+  // Tried partial request a few times, change to full request
+  if(retryCounter < MAX_RETRY) {
+    retryCounter++;
+    requestProfilePage();
+  } else {
+    tooManyRetryError();
+  }
+}
+
+
+
+
 
 // Handle data response
 replaceContent = function(response) {
@@ -174,51 +180,60 @@ replaceContent = function(response) {
   var data = response.responseText;
   var history;
 
-  if(!data || (data.length === 0)
-      || (data.indexOf('ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory') === -1)) {
+  if(!data || (data.length === 0) || (data.indexOf(HISTORY_ID) === -1)) {
     // No history in data response
     return false;
   }
 
-  var partialResponse = (data.indexOf('<!DOCTYPE html') === -1);
-
-  if(partialResponse) {
-    // Find history and viewState in partial response
-    var startPos = data.indexOf('<div');
-    var endPos = data.lastIndexOf('/table>');
-    if(startPos >= 0 && endPos >= 0) {
-      endPos = endPos + '/table>'.length;
-      history = $j('<div></div>').html(data.slice(startPos, endPos));
-      viewState = data.match(/\|__VIEWSTATE\|.*?\|/gm)[0].replace(/\|__VIEWSTATE\|/gm, '').replace(/\|/gm, '') || viewState;
-      eventValidation = data.match(/\|__EVENTVALIDATION\|.*?\|/gm)[0].replace(/\|__EVENTVALIDATION\|/gm, '').replace(/\|/gm, '') || eventValidation;
+  // Find history in response
+  $j.each($j.parseHTML(data), function(i, el) {
+    if(el.id === 'aspnetForm') {
+      history = GetHistory($j(el));
+      return false;
     }
-  } else {
-    // Find history and viewState in full response
-    $j.each($j.parseHTML(data), function(i, el) {
-      if(el.id === 'aspnetForm') {
-        var doms = $j(el);
-        viewState = doms.find('#__VIEWSTATE').val();
-        eventValidation = doms.find('#__EVENTVALIDATION').val();
-        history = doms.find('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory');
-        return false;
-      }
-    });
-  }
-
+  });
+  
+  console.log(history);
+  
   if(history.length === 0) return false;
 
   $j('div#lm_history').html(history.html());
   replaceButton();
 
-  console.log(partialResponse ? 'partial request finished' : 'full request finished');
+  console.log('request finished');
   useFullRequest = false;
 
-  // Change filter to show all post
-  if(!partialResponse) {
-    window.LM_CHANGE_FILTER_TYPE = 'all';
-  }
-
   return true;
+}
+
+// Change button event, let this script handle page changing
+replaceButton = function() {
+  var history = $j('div#lm_history');
+  history.find(NEXT_BUTTON_SELECTOR)
+      .attr('id', 'lm_btn_Next')
+      .attr('name', 'lm_btn_Next')
+      .click(nextPage);
+  history.find(PREVIOUS_BUTTON_SELECTOR)
+      .attr('id', 'lm_btn_Previous')
+      .attr('name', 'lm_btn_Previous')
+      .click(previousPage);
+  history.find(GO_BUTTON_SELECTOR)
+      .attr('id', 'lm_btn_GoPageNo')
+      .attr('name', 'lm_btn_GoPageNo')
+      .click(gotoPage);
+  history.find(FILTER_TYPE_SELECTOR)
+      .attr('id', 'lm_filter_type')
+      .attr('name', 'lm_filter_type')
+      .attr('onchange', '')
+      .change(changeFilter);
+  history.find(FILTER_YEAR_SELECTOR)
+      .remove();
+  history.find(PAGE_NO_TEXTBOX_SELECTOR)
+      .attr('id', 'lm_PageNoTextBox')
+      .attr('name', 'lm_PageNoTextBox');
+  
+  history.find(RED_PEOPLE_POUND_SELECTOR)
+      .remove();
 }
 
 // Store values needed for changing page
@@ -227,184 +242,12 @@ storeStatus = function() {
   window.LM_CURRENT_PAGE = parseInt(history.find('#lm_PageNoTextBox').val());
   window.LM_FILTER_TYPE = history.find('#lm_filter_type').val();
 
-  GM_setValue('viewstate', viewState);
-  GM_setValue('eventvalidation', eventValidation);
   GM_setValue('lm_last_timestamp', (new Date().getTime()).toString());
 
   storeLocal('lm_change_page', window.LM_CURRENT_PAGE);
   storeLocal('lm_filter_type', window.LM_FILTER_TYPE);
 
   console.log('lm page: ' + window.LM_CURRENT_PAGE);
-}
-
-// Logout if the can't load partial page
-logout = function() {
-
-  var message = '登出緊<img src="faces/angel.gif" />';
-  changeAndFlashMessage(message);
-
-  console.log('Try to logout');
-  var requestUrl = 'http://' + window.location.hostname + '/logout.aspx';
-
-  ajaxRequest = GM_xmlhttpRequest({
-    method: 'HEAD',
-    url: requestUrl,
-    timeout: ajaxTimeout,
-    headers: {'Content-type': 'application/x-www-form-urlencoded'},
-    onload: function(response) {
-        ajaxRequest = null;
-        clearTimeout(ajaxRequestTimer);
-        console.log('logged out.');
-
-        needLogin = true;
-        initPageFull();
-        requestProfilePage();
-      },
-    onerror: function(response) {
-        ajaxRequest = null;
-        clearTimeout(ajaxRequestTimer);
-        console.log('logout failed.');
-
-        setTimeout(logout, 15000);
-      },
-    ontimeout: handleLogoutTimeout
-  });
-
-  // Specical handling for TamperMonkey
-  if(typeof(TM_xmlhttpRequest) !== 'undefined') {
-    timeoutRequest(function() {handleTamperMonkeyTimeout(handleLogoutTimeout);});
-  }
-}
-
-// Popup login page in new window if it was logout
-popupLoginWindow = function() {
-  if(!needLogin) return;
-  needLogin = false;
-
-  var message = '登出左, 開左登入晝面比你登入返<img src="faces/angel.gif" />';
-  changeAndFlashMessage(message);
-
-  var Url = 'http://' + window.location.hostname + '/login.aspx';
-  var loginWindow = window.open(Url, 'hkg_login')
-  setTimeout(function() {checkPopupLogined(loginWindow)}, 200);
-}
-
-// Check login popup window status and close it if logined 
-checkPopupLogined = function(targetWindow) {
-  try {
-    var logoutLink = $j(targetWindow.document).find('a[href="javascript:islogout();"]');
-    if(logoutLink.length !== 0) {
-      console.log('popup logined');
-      targetWindow.close();
-
-      clearMessage();
-    } else {
-      setTimeout(function() {checkPopupLogined(targetWindow)}, 200);
-    }
-  } catch(err) {
-    // Chrome only
-    if(err.name == 'SecurityError')
-    {
-      console.log(err);
-      setTimeout(function() {checkPopupLogined(targetWindow)}, 1000);
-      console.log('Wait 1 second to determine user has login or not');
-    }
-  }
-}
-
-// Can't simply set 'timeout' value in GM_xmlhttpRequest as TamperMonkey do not support it
-timeoutRequest = function(callback) {
-  clearTimeout(ajaxRequestTimer);
-  ajaxRequestTimer = setTimeout(callback, ajaxTimeout);
-}
-
-handleTamperMonkeyTimeout = function(callback) {
-  if(ajaxRequest && ajaxRequest.abort) {
-    ajaxRequest.abort();
-    callback();
-  }
-}
-
-handleTimeout = function() {
-  var message = '太慢喇再Load過<img src="faces/sosad.gif" />';
-
-  changeAndFlashMessage(message);
-  RetryFullRequest();
-}
-
-handleLogoutTimeout = function() {
-  console.log('server logout timeout');
-  setTimeout(logout, 15000);
-}
-
-handleError = function() {
-  console.log('server error');
-  var message = 'Server 有問題再Load過<img src="faces/sosad.gif" />';
-
-  changeAndFlashMessage(message);
-  RetryFullRequest();
-}
-
-tooManyRetryError = function() {
-  var message = '唔知咩事試過幾次都唔得, 你Reload下啦<img src="faces/sosad.gif" />';
-
-  changeAndFlashMessage(message);
-}
-
-RetryFullRequest = function() {
-  // Tried partial request a few times, change to full request
-  if(!useFullRequest) {
-    useFullRequest = true;
-    logout();
-  } else {
-    tooManyRetryError();
-  }
-}
-
-changeAndFlashMessage = function(message) {
-  var messageDiv = $j('div#lm_message');
-  messageDiv.html(message);
-  flashMessage(messageDiv);
-}
-
-clearMessage = function() {
-  var messageDiv = $j('div#lm_message');
-  messageDiv.html('');
-  messageDiv.stop();
-}
-
-flashMessage = function(item) {
-  item.stop();
-  item.animate({"opacity": "0"},50).animate({"opacity": "1"},50, function(){flashMessage(item);});
-}
-
-// Change button event, let this script handle page changing
-replaceButton = function() {
-  var history = $j('div#lm_history');
-  history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_btn_Next')
-      .attr('id', 'lm_btn_Next')
-      .attr('name', 'lm_btn_Next')
-      .click(nextPage);
-  history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_btn_Previous')
-      .attr('id', 'lm_btn_Previous')
-      .attr('name', 'lm_btn_Previous')
-      .click(previousPage);
-  history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_btn_GoPageNo')
-      .attr('id', 'lm_btn_GoPageNo')
-      .attr('name', 'lm_btn_GoPageNo')
-      .click(gotoPage);
-  history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_filter_type')
-      .attr('id', 'lm_filter_type')
-      .attr('name', 'lm_filter_type')
-      .attr('onchange', '')
-      .change(changeFilter);
-  history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_ddl_filter_year')
-      .attr('id', 'lm_filter_year')
-      .attr('name', 'lm_filter_year')
-      .attr('onchange', '');
-  history.find('#ctl00_ContentPlaceHolder1_mainTab_mainTab1_PageNoTextBox')
-      .attr('id', 'lm_PageNoTextBox')
-      .attr('name', 'lm_PageNoTextBox');
 }
 
 // Store the target page number in cookie
@@ -438,6 +281,12 @@ changeFilter = function() {
   return false;
 }
 
+
+
+
+
+// localStorage related
+
 storeLocal = function(key, value) {
   if(typeof(value) !== 'undefined' && value !== null) {
     localStorage[key] = JSON.stringify(value);
@@ -456,12 +305,45 @@ deleteLocal = function(key) {
   localStorage.remoteItem(key);
 }
 
-clearOldCookie = function() {
-  if(!loadLocal('cookie_cleared')) {
-    document.cookie = 'lm_change_page=;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    storeLocal('cookie_cleared', true);
-  }
+
+
+// Status message related
+loadingMessage = function() {
+  changeAndFlashMessage('Load緊呀等陣啦<img src="faces/angel.gif" />');
 }
+
+timeoutMessage = function() {
+  changeAndFlashMessage('太慢喇再Load過<img src="faces/sosad.gif" />');
+}
+
+errorMessage = function() {
+  changeAndFlashMessage('Server 有問題再Load過<img src="faces/sosad.gif" />');
+}
+
+tooManyRetryMessage = function() {
+  changeAndFlashMessage('唔知咩事試過幾次都唔得, 你Reload下啦<img src="faces/sosad.gif" />');
+}
+
+changeAndFlashMessage = function(message) {
+  var messageDiv = $j('div#lm_message');
+  messageDiv.html(message);
+  flashMessage(messageDiv);
+}
+
+clearMessage = function() {
+  var messageDiv = $j('div#lm_message');
+  messageDiv.html('');
+  messageDiv.stop();
+}
+
+flashMessage = function(item) {
+  item.stop();
+  item.animate({"opacity": "0"},50).animate({"opacity": "1"},50, function(){flashMessage(item);});
+}
+
+
+
+// Helper funcitons
 
 shuffle = function(arr) {
   for(
@@ -472,27 +354,24 @@ shuffle = function(arr) {
   return arr;
 }
 
-setup = function() {
-  $j('<div id="lm"></div><br />').insertBefore('div#ctl00_ContentPlaceHolder1_mainTab');
+
+
+// Initialization
+
+setupPageElement = function() {
+  $j('<div id="lm"></div><br />').insertAfter($j('div#ctl00_ContentPlaceHolder1_ProfileForm').children()[0]);
   $j('div#lm').html('<div>起底</div><div id="lm_history"></div>');
 
   $j('<div id="lm_message"></div>').insertBefore('div#lm');
-  var message = 'Load緊呀等陣啦<img src="faces/angel.gif" />';
-  changeAndFlashMessage(message);
+  loadingMessage();
 }
 
 start = function() {
-  clearOldCookie();
-  var history = $j('div#ctl00_ContentPlaceHolder1_mainTab_mainTab1_UpdatePanelHistory');
+  var history = $j(HISTORY_SELECTOR);
   if(history.length === 1) return;
 
-  setup();
-
-  if(initPagePartial()) {
-    requestProfilePage(changePage);
-  } else {
-    logout();
-  }
+  setupPageElement();
+  requestProfilePage();
 }
 
 start();
