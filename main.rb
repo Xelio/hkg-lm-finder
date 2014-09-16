@@ -48,7 +48,7 @@ def get_uri(url)
   halt 404 if uri.host.nil? || uri.host.index(/^[^\.]+\.hkgolden\.com/).nil?
   halt 404 if uri.path.nil? || uri.path.index(/^\/ProfilePage/).nil?
   
-  $logger.debug(uri.to_s)
+  # $logger.debug(uri.to_s)
   uri
 end
 
