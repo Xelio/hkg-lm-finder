@@ -1,4 +1,5 @@
 require 'sinatra'
+require 'oboe-heroku'
 require 'open-uri'
 require 'addressable/uri'
 require 'logger'

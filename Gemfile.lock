@@ -5,6 +5,11 @@ GEM
     daemons (1.1.9)
     eventmachine (1.0.3)
     excon (0.39.5)
+    json (1.8.1)
+    oboe (2.7.1.7)
+      json
+    oboe-heroku (0.9.15.6)
+      oboe (>= 2.7.1.7)
     rack (1.5.2)
     rack-protection (1.5.3)
       rack
@@ -24,5 +29,6 @@ PLATFORMS
 DEPENDENCIES
   addressable
   excon
+  oboe-heroku
   sinatra
   thin
