@@ -29,6 +29,7 @@ PLATFORMS
 DEPENDENCIES
   addressable
   excon
+  oboe
   oboe-heroku
   sinatra
   thin

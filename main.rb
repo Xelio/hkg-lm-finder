@@ -1,5 +1,6 @@
 require 'sinatra'
 require 'oboe-heroku'
+require 'oboe'
 require 'open-uri'
 require 'addressable/uri'
 require 'logger'
@@ -32,7 +33,11 @@ get %r{/proxy/(.+)} do |url|
   uri = get_uri(request_url)
   
   stream do |out|
-    process_request(uri, request, out)
+    if defined? Oboe::API
+      stream_request_with_oboe(uri, request, out)
+    else
+      stream_request(uri, request, out)
+    end
   end
 end
 
@@ -52,7 +57,18 @@ def get_uri(url)
   uri
 end
 
-def process_request(uri,  request, out_stream)
+def stream_request_with_oboe(uri, request, out_stream)
+  layer_name = 'stream'
+  report_kvs = {}
+  report_kvs['HTTP-Host'] = uri.host
+  report_kvs[:URL] = uri.path
+
+  Oboe::API.start_trace(layer_name, request['X-Trace'], report_kvs) do
+    stream_request(uri, request, out_stream)
+  end
+end
+
+def stream_request(uri, request, out_stream)
   begin
     headers = { "Content-Type" => request.content_type, 
                               "User-Agent"=>request.user_agent}
