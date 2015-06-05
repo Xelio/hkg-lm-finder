@@ -3,7 +3,8 @@ HKGolden LM finder
 
 Let you find the post you replied or LMed in your profile page.
 
-Please note that this script may logout to get the history page and popup a login page to let you login again. This is required because admin sync the login status between all servers.
+This script will get LM page through a custom web proxy and display it in profile page. 
+Anyone can deploy main.rb, Gemfile, Gemfile.lock, Procfile to Heroku or other PaaS to create the custom web proxy.
 
 ## How to install?
 
