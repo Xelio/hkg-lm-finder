@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           HKG LM finder
 // @namespace      http://github.com/Xelio/
-// @version        6.0.1
+// @version        6.1.1
 // @description    HKG LM finder
 // @downloadURL    https://github.com/Xelio/hkg-lm-finder/raw/master/hkg-lm-finder.user.js
 // @include        http://forum*.hkgolden.com/profilepage.aspx?userid=*
@@ -11,7 +11,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @copyright      2013, Xelio, Peach(Fix of PM, 紅人榜)
+// @copyright      2015, Xelio, Peach(Fix of PM, 紅人榜)
 // ==/UserScript==
 
 /*
@@ -60,7 +60,7 @@ var FILTER_YEAR_SELECTOR = '#ctl00_ContentPlaceHolder1_ddl_filter_year';
 var PAGE_NO_TEXTBOX_SELECTOR = '#ctl00_ContentPlaceHolder1_pageTextBox';
 var RED_PEOPLE_POUND_SELECTOR = '#ctl00_ContentPlaceHolder1_mp4';
 
-var WEB_PROXY_URL = 'http://hkg-lm-loader-1.xelio.ml/proxy/';
+var WEB_PROXY_URL = 'http://hkg-lm-loader-1.xelio.eu.org/proxy/';
 var GetRequestURL = function(page, filter_type) {
   return WEB_PROXY_URL
   		+ selectedServer + '.hkgolden.com/ProfilePage.aspx?userid=' + window.location.href.match(/userid=(\d+)/)[1]
